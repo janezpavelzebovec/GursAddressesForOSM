@@ -189,9 +189,9 @@ namespace OsmGursBuildingImport
 
             if (anythingWasSet)
             {
-                UpdateAttribute(attributes, "source:addr", "GURS");
+                UpdateAttribute(attributes, "addr:source", "GURS");
                 if (!string.IsNullOrEmpty(address.Date))
-                    UpdateAttribute(attributes, "source:addr:date", address.Date);
+                    UpdateAttribute(attributes, "addr:source:date", address.Date);
             }
             // If only thing GURS is contributing is ID...
             // lets not state it is as source, because someone else
@@ -204,14 +204,40 @@ namespace OsmGursBuildingImport
             var newBuilding = GeometryToOsmGeo(gursBuilding.Geometry);
             newBuilding.Tags ??= new TagsCollection();
             newBuilding.Tags.Add("building", "yes");
-            newBuilding.Tags.Add("source:geometry", "GURS");
+            newBuilding.Tags.Add("geometry:source", "GURS");
             if (!string.IsNullOrEmpty(gursBuilding.Date))
-                newBuilding.Tags.Add(new Tag("source:geometry:date", gursBuilding.Date));
+                newBuilding.Tags.Add(new Tag("geometry:source:date", gursBuilding.Date));
+            
             if (gursBuilding.ConstructionYear.HasValue)
             {
-                newBuilding.Tags.Add(new Tag("construction_date", gursBuilding.ConstructionYear.ToString()));
-                newBuilding.Tags.Add(new Tag("source:construction_date", "GURS"));
+                newBuilding.Tags.Add(new Tag("start_date", gursBuilding.ConstructionYear.ToString()));
+                newBuilding.Tags.Add(new Tag("start_date:source", "GURS"));
+
             }
+            /*else
+            {
+                // For buildings without construction date
+                newBuilding.Tags.Add(new Tag("start_date", "2025"));
+                newBuilding.Tags.Add(new Tag("start_date:edtf", "/2025"));
+            }*/
+            else
+            // For buildings without construction date
+            {
+                if (!string.IsNullOrEmpty(gursBuilding.Date))
+                {
+                    // Uporabi poln datum iz GURS (format: YYYY-MM-DD)
+                    newBuilding.Tags.Add(new Tag("start_date", gursBuilding.Date));
+                    newBuilding.Tags.Add(new Tag("start_date:edtf", $"/{gursBuilding.Date}"));
+                }
+                else
+                {
+                    // Če ni datuma, uporabi trenutni datum
+                    var currentDate = DateTime.Now.ToString("yyyy-MM-dd");
+                    newBuilding.Tags.Add(new Tag("start_date", currentDate));
+                    newBuilding.Tags.Add(new Tag("start_date:edtf", $"/{currentDate}"));
+                }
+            }
+            
             UpdateBuilding(newBuilding, gursBuilding, setAddressOnBuilding);
         }
 
