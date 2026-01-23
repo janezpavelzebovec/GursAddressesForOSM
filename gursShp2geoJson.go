@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/fs"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -54,7 +54,7 @@ func readShapefileToMap(shapeFileName string, keyColumnName, valueColumnName str
 
 			key := DecodeWindows1250(shapeReader.Attribute(keyColumnIndex))
 
-			if override, overridden := overrides[valueUtf]; overridden {
+			if override, overriden := overrides[valueUtf]; overriden {
 				result[key] = override
 			} else {
 				result[key] = valueUtf
@@ -279,12 +279,12 @@ func processRecord(shapeReader *shp.Reader) (*geojson.Feature, string, string) {
 	   10	D_OD D 8 Datum veljavnosti
 	   11	DV_OD D 8 Datum vnosa v bazo
 	   12	STATUS C 1 Status veljavnosti zapisa (V – veljavno stanje)
-	   13	CEN_E ali Y_C N 6.0 E (D96/TM) ali Y (D48/GK) koordinata centroida hišne številke
-	   14	CEN_N ali X_C N 6.0 N (D96/TM) ali X (D48/GK) koordinata centroida hišne številke
+	   13	CEN_E ali Y_C N 6.0 E (D96/TM) ali Y (D48/GK) koordinata centroida hišne številke 
+	   14	CEN_N ali X_C N 6.0 N (D96/TM) ali X (D48/GK) koordinata centroida hišne številke 
 	*/
 	labela := shapeReader.Attribute(4)
 
-	f.SetProperty(tagHousenumber, DecodeWindows1250(labela))
+	f.SetProperty(tagHousenumber, strings.ToLower(DecodeWindows1250(labela)))
 
 	determineStreetOrPlaceName(shapeReader, f, lon)
 
@@ -504,7 +504,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		err = os.WriteFile(catGeoJSONFileName, rawJSON, fs.FileMode(0644))
+		err = ioutil.WriteFile(catGeoJSONFileName, rawJSON, 0644)
 		if err != nil {
 			log.Fatal(err)
 		}
