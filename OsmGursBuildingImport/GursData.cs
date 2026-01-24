@@ -41,7 +41,7 @@ namespace OsmGursBuildingImport
         string HouseNumber,
         BilingualName StreetName,
         PostInfo PostInfo,
-        BilingualName VillageName
+        BilingualName VillageName,
         int? BuildingConstructionYear  // DODANO Za start_date naslovov
     );
     record ProcessingArea(Geometry Geometry, string Name, List<BuildingInfo> Buildings, string pathToGeojson, string pathToPoly)
@@ -376,7 +376,7 @@ namespace OsmGursBuildingImport
                     minElevation,
                     maxElevation,
                     elevation,
-                    levels,
+                    levels
                     //buildingType,
                     //material
                     ));
@@ -386,4 +386,5 @@ namespace OsmGursBuildingImport
         }
     }
 }
+
 
