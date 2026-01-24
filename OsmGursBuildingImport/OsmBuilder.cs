@@ -35,18 +35,13 @@ namespace OsmGursBuildingImport
             var attributes = building.Tags;
             var anythingUpdated = UpdateAttribute(attributes, "ref:gurs:sta_sid", gursBuilding.Id.ToString());
             var addresses = gursBuilding.Addresses;
-            if (addresses != null && setAddressOnBuilding)
+            // SPREMENJENO ZA OHM: VEDNO ustvari naslove kot ločena vozlišča
+            if (addresses != null && addresses.Count > 0)
             {
-                if (addresses.Count > 1)
+                // Za OpenHistoricalMap: vsi naslovi so ločena vozlišča z lastnim start_date
+                foreach (var addr in addresses)
                 {
-                    foreach (var addr in addresses)
-                    {
-                        CreateNewNodeFromAddress(addr);
-                    }
-                }
-                else
-                {
-                    anythingUpdated |= SetAddressAttributes(addresses[0], attributes);
+                    CreateNewNodeFromAddress(addr);
                 }
             }
 
@@ -193,6 +188,26 @@ namespace OsmGursBuildingImport
                 UpdateAttribute(attributes, "addr:source", "GURS");
                 if (!string.IsNullOrEmpty(address.Date))
                     UpdateAttribute(attributes, "addr:source:date", address.Date);
+                
+                // SPREMENJENO ZA OHM: start_date logika za naslove
+                // start_date = datum zadnje posodobitve (ali trenutni datum)
+                var lastUpdateDate = !string.IsNullOrEmpty(address.Date) 
+                    ? address.Date 
+                    : DateTime.Now.ToString("yyyy-MM-dd");
+                
+                UpdateAttribute(attributes, "start_date", lastUpdateDate);
+                
+                // DODANO ZA OHM: start_date za naslove (enak kot zgradba ali nedoločen)
+                if (address.BuildingConstructionYear.HasValue)
+                {
+                    // Če ima zgradba letnico, uporabi samo leto
+                    UpdateAttribute(attributes, "start_date:edtf", $"{address.BuildingConstructionYear}/{lastUpdateDate}");
+                }
+                else
+                {
+                    // Če ni letnice zgradbe, naslov obstaja že pred zadnjo posodobitvijo
+                    UpdateAttribute(attributes, "start_date:edtf", $"/{lastUpdateDate}");
+                }
             }
             // If only thing GURS is contributing is ID...
             // lets not state it is as source, because someone else
@@ -207,9 +222,9 @@ namespace OsmGursBuildingImport
             newBuilding.Tags.Add("building", "yes");
             
             // SPREMENJENO ZA OHM: source:geometry → geometry:source
-            newBuilding.Tags.Add("geometry:source", "GURS");
+            newBuilding.Tags.Add("source", "GURS");
             if (!string.IsNullOrEmpty(gursBuilding.Date))
-                newBuilding.Tags.Add(new Tag("geometry:source:date", gursBuilding.Date));
+                newBuilding.Tags.Add(new Tag("source:date", gursBuilding.Date));
             
             // SPREMENJENO ZA OHM: construction_date → start_date
             if (gursBuilding.ConstructionYear.HasValue)
@@ -254,6 +269,15 @@ namespace OsmGursBuildingImport
             if (gursBuilding.MaxElevation.HasValue)
             {
                 newBuilding.Tags.Add(new Tag("max_ele", gursBuilding.Height.Value.ToString("F1")));
+            }
+            // Višina zgradbe = H2 - H3 (od karakteristične višine do vrha)
+            if (gursBuilding.Elevation.HasValue && gursBuilding.MaxElevation.HasValue)
+            {
+                var buildingHeight = gursBuilding.MaxElevation.Value - gursBuilding.Elevation.Value;
+                if (buildingHeight > 0)
+                {
+                    newBuilding.Tags.Add(new Tag("height", buildingHeight.ToString("F1")));
+                }
             }
             if (gursBuilding.Elevation.HasValue)
             {
@@ -363,4 +387,5 @@ namespace OsmGursBuildingImport
         }
     }
 }
+
 
