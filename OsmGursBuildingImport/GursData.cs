@@ -27,10 +27,10 @@ namespace OsmGursBuildingImport
         string? Date,
         List<Address>? Addresses,
         int? ConstructionYear,
-        double? Height,          // DODANO Višina zgradbe
         int? Levels,             // DODANO Število nadstropij
-        double? Elevation,       // DODANO Nadmorska višina (centroid)
         double? MinElevation,    // DODANO Najnižja nadmorska višina
+        double? MaxElevation,    // DODANO Najvišja nadmorska višina
+        double? Elevation,       // DODANO Nadmorska višina (centroid)
         string? BuildingType,    // DODANO Vrsta zgradbe
         string? Material         // DODANO Material zgradbe
     );
@@ -347,25 +347,25 @@ namespace OsmGursBuildingImport
                     yearOfConstruction = null;
                 }
             
-                var height = shapeReader["VISINA"] switch {// DODANO
+                var minElevation = shapeReader["VISINA_H1"] switch {// DODANO (Najnižja višinska kota stavbe)
                     double val => val,
                     _ => (double?)null
                 };
-                var levels = shapeReader["ST_ETAZ"] switch {// DODANO
+                var maxElevation = shapeReader["VISINA_H2"] switch {// DODANO (Najvišja višinska kota stavbe)
+                    double val => val,
+                    _ => (double?)null
+                };
+                var elevation = shapeReader["VISINA_H3"] switch {// DODANO (Karakteristična višina stavbe)
+                    double val => val,
+                    _ => (double?)null
+                };
+                var levels = shapeReader["STEVILO_ET"] switch {// DODANO (Število etaž)
                     double val => (int)val,
                     int val => val,
                     _ => (int?)null
                 };
-                var elevation = shapeReader["NADM_VISINA"] switch {// DODANO
-                    double val => val,
-                    _ => (double?)null
-                };
-                var minElevation = shapeReader["MIN_NADM_VISINA"] switch {// DODANO
-                    double val => val,
-                    _ => (double?)null
-                };
-                var buildingType = shapeReader["VRSTA_STAVBE"]?.ToString();// DODANO
-                var material = shapeReader["MATERIAL"]?.ToString();// DODANO
+                //var buildingType = shapeReader["VRSTA_STAVBE"]?.ToString();// DODANO
+                //var material = shapeReader["MATERIAL"]?.ToString();// DODANO
                 
                 BuildingsIndex.Insert(geometry.EnvelopeInternal, new BuildingInfo(
                     id,
@@ -373,12 +373,12 @@ namespace OsmGursBuildingImport
                     null,
                     addresses,
                     yearOfConstruction,
-                    height,
-                    levels,
-                    elevation,
                     minElevation,
-                    buildingType,
-                    material
+                    maxElevation,
+                    elevation,
+                    levels,
+                    //buildingType,
+                    //material
                     ));
             }
 
@@ -386,3 +386,4 @@ namespace OsmGursBuildingImport
         }
     }
 }
+
