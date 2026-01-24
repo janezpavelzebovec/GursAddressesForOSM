@@ -22,8 +22,28 @@ namespace OsmGursBuildingImport
     record BilingualName(string Name, string NameSecondLanguage);
     record PostInfo(short Id, BilingualName Name);
     record VotingArea(Geometry Geometry, string Name, string Id);
-    record BuildingInfo(long Id, Geometry Geometry, string? Date, List<Address>? Addresses, int? ConstructionYear);
-    record Address(long Id, Geometry Geometry, string Date, string HouseNumber, BilingualName StreetName, PostInfo PostInfo, BilingualName VillageName);
+    record BuildingInfo(
+        long Id, Geometry Geometry,
+        string? Date,
+        List<Address>? Addresses,
+        int? ConstructionYear,
+        double? Height,          // DODANO Višina zgradbe
+        int? Levels,             // DODANO Število nadstropij
+        double? Elevation,       // DODANO Nadmorska višina (centroid)
+        double? MinElevation,    // DODANO Najnižja nadmorska višina
+        string? BuildingType,    // DODANO Vrsta zgradbe
+        string? Material         // DODANO Material zgradbe
+    );
+    record Address(
+        long Id,
+        Geometry Geometry,
+        string Date,
+        string HouseNumber,
+        BilingualName StreetName,
+        PostInfo PostInfo,
+        BilingualName VillageName
+        int? BuildingConstructionYear  // DODANO Za start_date naslovov
+    );
     record ProcessingArea(Geometry Geometry, string Name, List<BuildingInfo> Buildings, string pathToGeojson, string pathToPoly)
     {
         public bool Process { get; set; }
@@ -35,17 +55,19 @@ namespace OsmGursBuildingImport
         public Dictionary<string, ProcessingArea> ProcessingAreas = new();
 
         Dictionary<long, Address> Addresses = new();
-        List<VotingArea> VotingAreas = new();
+        List<VotingArea> StatisticalAreas = new();  // SPREMENJENO
         Dictionary<string, Dictionary<string, string>> Overrides = new();
         STRtree<BuildingInfo> BuildingsIndex = new();
         Dictionary<long, List<Address>> BuildingToAddresses = new();
+        Dictionary<long, int?> BuildingConstructionYears = new();  // DODANO
 
         public GursData(string dir, string overridesDir, string tempDir)
         {
             LoadOverrides(overridesDir);
+            LoadBuildings(dir);  // SPREMENJENO: Najprej zgradbe, da dobimo leta, potem naslovi
             LoadAddresses(dir);
-            LoadBuildings(dir);
-            LoadVotingAreasGeoJson();
+            //LoadVotingAreasGeoJson();
+            LoadStatisticalRegionsGeoJson();  // SPREMENJENO: StatisticalRegions namesto VotingAreas
 
             BuildProcessingAreas(tempDir);
         }
@@ -120,15 +142,23 @@ namespace OsmGursBuildingImport
             var poliesDir = Path.Combine(tempDir, "polygons");
             Directory.CreateDirectory(poliesDir);
 
-            foreach (var votingArea in VotingAreas)
+            // SPREMENJENO: StatisticalRegions namesto VotingAreas
+            foreach (var region in StatisticalRegions)
             {
+                //var newArea = new ProcessingArea(
+                //    votingArea.Geometry,
+                //    votingArea.Id,
+                //    new List<BuildingInfo>(),
+                //    WriteGeoJson(poliesDir, votingArea.Geometry, votingArea.Id),
+                //    WritePoly(poliesDir, votingArea.Geometry, votingArea.Id));
+                //ProcessingAreas.Add(votingArea.Id, newArea);
                 var newArea = new ProcessingArea(
-                    votingArea.Geometry,
-                    votingArea.Id,
+                    region.Geometry,
+                    region.Id,
                     new List<BuildingInfo>(),
-                    WriteGeoJson(poliesDir, votingArea.Geometry, votingArea.Id),
-                    WritePoly(poliesDir, votingArea.Geometry, votingArea.Id));
-                ProcessingAreas.Add(votingArea.Id, newArea);
+                    WriteGeoJson(poliesDir, region.Geometry, region.Id),
+                    WritePoly(poliesDir, region.Geometry, region.Id));
+                ProcessingAreas.Add(region.Id, newArea);
             }
 
             Parallel.ForEach(ProcessingAreas.Values, (area) => {
@@ -182,6 +212,10 @@ namespace OsmGursBuildingImport
                 var villageName = new BilingualName(OverrideString(settlementNameOverride, csvAddresses.GetString("NASELJE_NAZIV")), csvAddresses.GetString("NASELJE_NAZIV_DJ"));
                 if (streetName.Name == "")
                     streetName = villageName;
+                
+                // DODANO: Pridobi leto izgradnje zgradbe za ta naslov
+                BuildingConstructionYears.TryGetValue(buildingId, out var buildingYear);
+                
                 var address = new Address(id, geom, null, houseNumber, streetName, postInfo, villageName);
                 Addresses.Add(id, address);
                 if (BuildingToAddresses.TryGetValue(buildingId, out var list))
@@ -209,7 +243,7 @@ namespace OsmGursBuildingImport
             return result;
         }
 
-        void LoadVotingAreasGeoJson()
+        /*void LoadVotingAreasGeoJson()
         {
             using var sr = new StreamReader("VLV.geojson");
             var reader = new GeoJsonReader();
@@ -239,11 +273,33 @@ namespace OsmGursBuildingImport
                     index++;
                 }
             }
+        }*/
+        // SPREMENJENO: LoadVotingAreasGeoJson → LoadStatisticalRegionsGeoJson
+        void LoadStatisticalRegionsGeoJson()
+        {
+            // Uporabi StatisticalRegions.geojson namesto VLV.geojson
+            using var sr = new StreamReader("StatisticalRegions.geojson");
+            var reader = new GeoJsonReader();
+            var features = reader.Read<FeatureCollection>(sr.ReadToEnd());
+            
+            foreach (var feature in features)
+            {
+                var id = feature.Attributes["ID"]?.ToString();
+                var name = feature.Attributes["NAME"]?.ToString();
+                var geometry = feature.Geometry;
+                
+                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name))
+                    continue;
+                    
+                StatisticalRegions.Add(new VotingArea(geometry, name, id));
+            }
         }
 
         void LoadBuildings(string dir)
         {
             var buildingsPolygons = new Dictionary<long, Geometry>();
+            
+            // Prebere nadzemni tloris (prednostno)
             var shapeReader = new ShapefileDataReader(Path.Combine(dir, "Buildings", "KN_SLO_STAVBE_SLO_STAVBE_NADZEMNI_TLORIS", "KN_SLO_STAVBE_SLO_STAVBE_NADZEMNI_TLORIS_poligon.shp"), D96Factory);
             while (shapeReader.Read())
             {
@@ -252,6 +308,7 @@ namespace OsmGursBuildingImport
                 buildingsPolygons.Add(id, shapeReader.Geometry);
             }
 
+            // Prebere navadni tloris (če nadzemni ne obstaja)
             shapeReader = new ShapefileDataReader(Path.Combine(dir, "Buildings", "KN_SLO_STAVBE_SLO_STAVBE_TLORIS", "KN_SLO_STAVBE_SLO_STAVBE_TLORIS_poligon.shp"), D96Factory);
             while (shapeReader.Read())
             {
@@ -261,6 +318,8 @@ namespace OsmGursBuildingImport
                     continue;
                 buildingsPolygons.Add(id, shapeReader.Geometry);
             }
+            
+            // Preberi glavno datoteko z atributi
             shapeReader = new ShapefileDataReader(Path.Combine(dir, "Buildings", "KN_SLO_STAVBE_SLO_STAVBE", "KN_SLO_STAVBE_SLO_STAVBE_tocka.shp"), D96Factory);
             while (shapeReader.Read())
             {
@@ -276,24 +335,53 @@ namespace OsmGursBuildingImport
                 if (!BuildingToAddresses.TryGetValue(id, out var addresses))
                     addresses = null;
 
-                var yearOfConstruction = shapeReader["LETO_IZGRA"] switch {
+                // DODANO: Preberi dodatne atribute
+                var yearOfConstruction = shapeReader["LETO_IZGRA"] switch {// DODANO
                     double val => (int)val,
                     _ => (int?)null
                 };
 
-                if (yearOfConstruction > 2050 || yearOfConstruction < 1000)
+                if (yearOfConstruction > 2050 || yearOfConstruction < 1000)// DODANO
                 {
                     Console.WriteLine($"Year of construction outside range. {yearOfConstruction}");
                     yearOfConstruction = null;
                 }
+            
+                var height = shapeReader["VISINA"] switch {// DODANO
+                    double val => val,
+                    _ => (double?)null
+                };
+                var levels = shapeReader["ST_ETAZ"] switch {// DODANO
+                    double val => (int)val,
+                    int val => val,
+                    _ => (int?)null
+                };
+                var elevation = shapeReader["NADM_VISINA"] switch {// DODANO
+                    double val => val,
+                    _ => (double?)null
+                };
+                var minElevation = shapeReader["MIN_NADM_VISINA"] switch {// DODANO
+                    double val => val,
+                    _ => (double?)null
+                };
+                var buildingType = shapeReader["VRSTA_STAVBE"]?.ToString();// DODANO
+                var material = shapeReader["MATERIAL"]?.ToString();// DODANO
+                
                 BuildingsIndex.Insert(geometry.EnvelopeInternal, new BuildingInfo(
                     id,
                     geometry,
                     null,
                     addresses,
-                    yearOfConstruction
+                    yearOfConstruction,
+                    height,
+                    levels,
+                    elevation,
+                    minElevation,
+                    buildingType,
+                    material
                     ));
             }
+
             BuildingsIndex.Build();
         }
     }
