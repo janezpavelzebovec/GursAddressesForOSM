@@ -189,6 +189,7 @@ namespace OsmGursBuildingImport
 
             if (anythingWasSet)
             {
+                // SPREMENJENO ZA OHM: addr:source namesto source:addr
                 UpdateAttribute(attributes, "addr:source", "GURS");
                 if (!string.IsNullOrEmpty(address.Date))
                     UpdateAttribute(attributes, "addr:source:date", address.Date);
@@ -204,10 +205,13 @@ namespace OsmGursBuildingImport
             var newBuilding = GeometryToOsmGeo(gursBuilding.Geometry);
             newBuilding.Tags ??= new TagsCollection();
             newBuilding.Tags.Add("building", "yes");
+            
+            // SPREMENJENO ZA OHM: source:geometry → geometry:source
             newBuilding.Tags.Add("geometry:source", "GURS");
             if (!string.IsNullOrEmpty(gursBuilding.Date))
                 newBuilding.Tags.Add(new Tag("geometry:source:date", gursBuilding.Date));
             
+            // SPREMENJENO ZA OHM: construction_date → start_date
             if (gursBuilding.ConstructionYear.HasValue)
             {
                 newBuilding.Tags.Add(new Tag("start_date", gursBuilding.ConstructionYear.ToString()));
@@ -221,8 +225,8 @@ namespace OsmGursBuildingImport
                 newBuilding.Tags.Add(new Tag("start_date:edtf", "/2025"));
             }*/
             else
-            // For buildings without construction date
             {
+                // Za zgradbe brez letnice - uporabi poln datum iz GURS ali trenutni datum
                 if (!string.IsNullOrEmpty(gursBuilding.Date))
                 {
                     // Uporabi poln datum iz GURS (format: YYYY-MM-DD)
@@ -237,6 +241,34 @@ namespace OsmGursBuildingImport
                     newBuilding.Tags.Add(new Tag("start_date:edtf", $"/{currentDate}"));
                 }
             }
+
+            // DODANO: Dodatni atributi iz GURS
+            if (gursBuilding.Levels.HasValue && gursBuilding.Levels.Value > 0)
+            {
+                newBuilding.Tags.Add(new Tag("building:levels", gursBuilding.Levels.Value.ToString()));
+            }
+            if (gursBuilding.MinElevation.HasValue)
+            {
+                newBuilding.Tags.Add(new Tag("min_ele", gursBuilding.MinElevation.Value.ToString("F1")));
+            }
+            if (gursBuilding.MaxElevation.HasValue)
+            {
+                newBuilding.Tags.Add(new Tag("max_ele", gursBuilding.Height.Value.ToString("F1")));
+            }
+            if (gursBuilding.Elevation.HasValue)
+            {
+                newBuilding.Tags.Add(new Tag("ele", gursBuilding.Elevation.Value.ToString("F1")));
+            }
+            /*if (!string.IsNullOrEmpty(gursBuilding.BuildingType))
+            {
+                // Lahko dodate mapping GURS vrst zgradb v OSM vrednosti
+                // Primer: če je GURS vrsta "stanovanjska" → building=residential
+                newBuilding.Tags.Add(new Tag("building:type:gurs", gursBuilding.BuildingType));
+            }
+            if (!string.IsNullOrEmpty(gursBuilding.Material))
+            {
+                newBuilding.Tags.Add(new Tag("building:material", gursBuilding.Material));
+            }*/
             
             UpdateBuilding(newBuilding, gursBuilding, setAddressOnBuilding);
         }
@@ -331,3 +363,4 @@ namespace OsmGursBuildingImport
         }
     }
 }
+
