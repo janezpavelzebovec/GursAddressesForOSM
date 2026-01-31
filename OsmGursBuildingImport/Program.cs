@@ -30,10 +30,11 @@ namespace OsmGursBuildingImport
             {
                 try
                 {
-                    var restartToken = new CancellationTokenSource();
-                    int dayOfWeek = (int)DateTime.UtcNow.DayOfWeek;
-                    DateTime nextSunday6AM = DateTime.UtcNow.AddDays(7 - dayOfWeek).Date.AddHours(6);
-                    restartToken.CancelAfter(nextSunday6AM - DateTime.UtcNow);
+                    //var restartToken = new CancellationTokenSource();
+                    //int dayOfWeek = (int)DateTime.UtcNow.DayOfWeek;
+                    //DateTime nextSunday6AM = DateTime.UtcNow.AddDays(7 - dayOfWeek).Date.AddHours(6);
+                    //restartToken.CancelAfter(nextSunday6AM - DateTime.UtcNow);
+                    var restartToken = new CancellationTokenSource(); // Brez timeuta
                     var result = await Process(args, restartToken.Token);
                     if (result != 0)
                         return result;
@@ -41,7 +42,8 @@ namespace OsmGursBuildingImport
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.ToString());
-                    await Task.Delay(TimeSpan.FromMinutes(1));
+                    //await Task.Delay(TimeSpan.FromMinutes(1));
+                    return 1; // Return error namesto loop
                 }
             }
         }
@@ -63,9 +65,10 @@ namespace OsmGursBuildingImport
             Directory.CreateDirectory(tempDir);
 
             var cacheDir = Path.Combine(dataFolder, "cache");
-            if (Directory.Exists(cacheDir))
-                Directory.Delete(cacheDir, true);
-            Directory.CreateDirectory(cacheDir);
+            //if (Directory.Exists(cacheDir))
+            //    Directory.Delete(cacheDir, true);
+            if (!Directory.Exists(cacheDir))
+                Directory.CreateDirectory(cacheDir);;
 
             var addressesUrl = "https://ipi.eprostor.gov.si/jgp-service-api/display-views/groups/121/composite-products/141/file?filterParam=DRZAVA&filterValue=1";
             var addressesFile = Path.Combine(tempDir, "addresses.zip");
@@ -323,6 +326,7 @@ namespace OsmGursBuildingImport
 
         private static void CreateFull(ProcessingArea processingArea, string cacheFolder)
         {
+            Console.WriteLine($"Creating {processingArea.Name}..."); // DODANO
             var osmBuilderFull = new OsmBuilder();
             foreach (var gursBuilding in processingArea.Buildings)
             {
@@ -331,6 +335,7 @@ namespace OsmGursBuildingImport
 
             string areaPath = Path.Combine(cacheFolder, $"{processingArea.Name}.full");
             SaveData(areaPath, osmBuilderFull.GetGeos());
+            Console.WriteLine($"✓ Saved {processingArea.Name}"); // DODANO
         }
 
         private static STRtree<GeoOsmWithGeometry> LoadOsmData(string path)

@@ -27,10 +27,10 @@ namespace OsmGursBuildingImport
         string? Date,
         List<Address>? Addresses,
         int? ConstructionYear,
-        int? Levels,             // DODANO Število nadstropij
         double? MinElevation,    // DODANO Najnižja nadmorska višina
         double? MaxElevation,    // DODANO Najvišja nadmorska višina
         double? Elevation,       // DODANO Nadmorska višina (centroid)
+        int? Levels,             // DODANO Število nadstropij
         string? BuildingType,    // DODANO Vrsta zgradbe
         string? Material         // DODANO Material zgradbe
     );
@@ -55,7 +55,7 @@ namespace OsmGursBuildingImport
         public Dictionary<string, ProcessingArea> ProcessingAreas = new();
 
         Dictionary<long, Address> Addresses = new();
-        List<VotingArea> StatisticalAreas = new();  // SPREMENJENO
+        List<VotingArea> StatisticalRegions = new();  // SPREMENJENO
         Dictionary<string, Dictionary<string, string>> Overrides = new();
         STRtree<BuildingInfo> BuildingsIndex = new();
         Dictionary<long, List<Address>> BuildingToAddresses = new();
@@ -216,7 +216,7 @@ namespace OsmGursBuildingImport
                 // DODANO: Pridobi leto izgradnje zgradbe za ta naslov
                 BuildingConstructionYears.TryGetValue(buildingId, out var buildingYear);
                 
-                var address = new Address(id, geom, null, houseNumber, streetName, postInfo, villageName);
+                var address = new Address(id, geom, null, houseNumber, streetName, postInfo, villageName, buildingYear);
                 Addresses.Add(id, address);
                 if (BuildingToAddresses.TryGetValue(buildingId, out var list))
                     list.Add(address);
@@ -376,15 +376,14 @@ namespace OsmGursBuildingImport
                     minElevation,
                     maxElevation,
                     elevation,
-                    levels
-                    //buildingType,
-                    //material
-                    ));
+                    levels,
+                    null, // buildingType
+                    null // material
+                ));
             }
 
             BuildingsIndex.Build();
         }
     }
 }
-
 

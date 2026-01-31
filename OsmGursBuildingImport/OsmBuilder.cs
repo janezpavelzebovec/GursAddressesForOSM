@@ -34,8 +34,9 @@ namespace OsmGursBuildingImport
         {
             var attributes = building.Tags;
             var anythingUpdated = UpdateAttribute(attributes, "ref:gurs:sta_sid", gursBuilding.Id.ToString());
-            var addresses = gursBuilding.Addresses;
+            
             // SPREMENJENO ZA OHM: VEDNO ustvari naslove kot ločena vozlišča
+            var addresses = gursBuilding.Addresses;
             if (addresses != null && addresses.Count > 0)
             {
                 // Za OpenHistoricalMap: vsi naslovi so ločena vozlišča z lastnim start_date
@@ -114,7 +115,6 @@ namespace OsmGursBuildingImport
                 {
                     if (!attributes.ContainsKey("fixme" + i))
                     {
-
                         attributes["fixme" + i] = fixmeMessage;
                         return;
                     }
@@ -158,9 +158,6 @@ namespace OsmGursBuildingImport
 
             anythingWasSet |= UpdateAttribute(attributes, "addr:postcode", address.PostInfo.Id.ToString());
 
-            // We want to add village only when it's not already mentioned, so when user enters
-            // some address into navigation it re-assures them when seeing also correct village name...
-            // It is pretty common in Slovenia for people to be more familiar with village name than street names.
             if (!address.PostInfo.Name.Name.StartsWith(address.VillageName.Name) &&
                 address.StreetName.Name != address.VillageName.Name)
             {
@@ -197,10 +194,10 @@ namespace OsmGursBuildingImport
                 
                 UpdateAttribute(attributes, "start_date", lastUpdateDate);
                 
-                // DODANO ZA OHM: start_date za naslove (enak kot zgradba ali nedoločen)
+                // start_date:edtf = obdobje med izgradnjo zgradbe in zadnjo posodobitvijo
                 if (address.BuildingConstructionYear.HasValue)
                 {
-                    // Če ima zgradba letnico, uporabi samo leto
+                    // Naslov je bil dodan med izgradnjo in zadnjo posodobitvijo
                     UpdateAttribute(attributes, "start_date:edtf", $"{address.BuildingConstructionYear}/{lastUpdateDate}");
                 }
                 else
@@ -209,9 +206,7 @@ namespace OsmGursBuildingImport
                     UpdateAttribute(attributes, "start_date:edtf", $"/{lastUpdateDate}");
                 }
             }
-            // If only thing GURS is contributing is ID...
-            // lets not state it is as source, because someone else
-            // already got all relavant data elsewhere...
+            
             return UpdateAttribute(attributes, "ref:gurs:hs_mid", address.Id.ToString()) | anythingWasSet;
         }
 
@@ -221,7 +216,7 @@ namespace OsmGursBuildingImport
             newBuilding.Tags ??= new TagsCollection();
             newBuilding.Tags.Add("building", "yes");
             
-            // SPREMENJENO ZA OHM: source:geometry → geometry:source
+            // SPREMENJENO ZA OHM: source in source:date za zgradbe
             newBuilding.Tags.Add("source", "GURS");
             if (!string.IsNullOrEmpty(gursBuilding.Date))
                 newBuilding.Tags.Add(new Tag("source:date", gursBuilding.Date));
@@ -231,14 +226,7 @@ namespace OsmGursBuildingImport
             {
                 newBuilding.Tags.Add(new Tag("start_date", gursBuilding.ConstructionYear.ToString()));
                 newBuilding.Tags.Add(new Tag("start_date:source", "GURS"));
-
             }
-            /*else
-            {
-                // For buildings without construction date
-                newBuilding.Tags.Add(new Tag("start_date", "2025"));
-                newBuilding.Tags.Add(new Tag("start_date:edtf", "/2025"));
-            }*/
             else
             {
                 // Za zgradbe brez letnice - uporabi poln datum iz GURS ali trenutni datum
@@ -258,18 +246,7 @@ namespace OsmGursBuildingImport
             }
 
             // DODANO: Dodatni atributi iz GURS
-            if (gursBuilding.Levels.HasValue && gursBuilding.Levels.Value > 0)
-            {
-                newBuilding.Tags.Add(new Tag("building:levels", gursBuilding.Levels.Value.ToString()));
-            }
-            if (gursBuilding.MinElevation.HasValue)
-            {
-                newBuilding.Tags.Add(new Tag("min_ele", gursBuilding.MinElevation.Value.ToString("F1")));
-            }
-            if (gursBuilding.MaxElevation.HasValue)
-            {
-                newBuilding.Tags.Add(new Tag("max_ele", gursBuilding.Height.Value.ToString("F1")));
-            }
+            
             // Višina zgradbe = H2 - H3 (od karakteristične višine do vrha)
             if (gursBuilding.Elevation.HasValue && gursBuilding.MaxElevation.HasValue)
             {
@@ -279,21 +256,32 @@ namespace OsmGursBuildingImport
                     newBuilding.Tags.Add(new Tag("height", buildingHeight.ToString("F1")));
                 }
             }
+
+            // Število nadstropij
+            if (gursBuilding.Levels.HasValue && gursBuilding.Levels.Value > 0)
+            {
+                newBuilding.Tags.Add(new Tag("building:levels", gursBuilding.Levels.Value.ToString()));
+            }
+
+            // Nadmorska višina (H3 - karakteristična višina, pritličje/vhod)
             if (gursBuilding.Elevation.HasValue)
             {
                 newBuilding.Tags.Add(new Tag("ele", gursBuilding.Elevation.Value.ToString("F1")));
             }
-            /*if (!string.IsNullOrEmpty(gursBuilding.BuildingType))
-            {
-                // Lahko dodate mapping GURS vrst zgradb v OSM vrednosti
-                // Primer: če je GURS vrsta "stanovanjska" → building=residential
-                newBuilding.Tags.Add(new Tag("building:type:gurs", gursBuilding.BuildingType));
-            }
+
+            // Material nosilne konstrukcije
             if (!string.IsNullOrEmpty(gursBuilding.Material))
             {
                 newBuilding.Tags.Add(new Tag("building:material", gursBuilding.Material));
-            }*/
-            
+            }
+
+            // Tip položaja zgradbe (lahko uporabimo za namig building=*)
+            if (!string.IsNullOrEmpty(gursBuilding.BuildingType))
+            {
+                // Za referenco shranimo GURS tip
+                newBuilding.Tags.Add(new Tag("building:type:gurs", gursBuilding.BuildingType));
+            }
+
             UpdateBuilding(newBuilding, gursBuilding, setAddressOnBuilding);
         }
 
@@ -387,5 +375,3 @@ namespace OsmGursBuildingImport
         }
     }
 }
-
-
