@@ -246,7 +246,16 @@ namespace OsmGursBuildingImport
             }
 
             // DODANO: Dodatni atributi iz GURS
-            
+
+            if (gursBuilding.MinElevation.HasValue)
+            {
+                newBuilding.Tags.Add(new Tag("min_ele", gursBuilding.MinElevation.Value.ToString()));
+            }
+            if (gursBuilding.MaxElevation.HasValue)
+            {
+                newBuilding.Tags.Add(new Tag("max_ele", gursBuilding.MaxElevation.Value.ToString()));
+            }
+
             // Višina zgradbe = H2 - H3 (od karakteristične višine do vrha)
             if (gursBuilding.Elevation.HasValue && gursBuilding.MaxElevation.HasValue)
             {

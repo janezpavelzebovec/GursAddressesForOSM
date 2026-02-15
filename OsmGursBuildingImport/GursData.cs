@@ -66,10 +66,31 @@ namespace OsmGursBuildingImport
             LoadOverrides(overridesDir);
             LoadBuildings(dir);  // SPREMENJENO: Najprej zgradbe, da dobimo leta, potem naslovi
             LoadAddresses(dir);
+            LinkAddressesToBuildings(); // ← DODANO
             //LoadVotingAreasGeoJson();
             LoadStatisticalRegionsGeoJson();  // SPREMENJENO: StatisticalRegions namesto VotingAreas
 
             BuildProcessingAreas(tempDir);
+        }
+
+        void LinkAddressesToBuildings()
+        {
+            var updatedBuildings = new List<BuildingInfo>();
+            
+            foreach (var building in BuildingsIndex.Query(BuildingsIndex.Root.Bounds))
+            {
+                BuildingToAddresses.TryGetValue(building.Id, out var addresses);
+                
+                var updated = building with { Addresses = addresses };
+                updatedBuildings.Add(updated);
+            }
+            
+            BuildingsIndex = new STRtree<BuildingInfo>();
+            foreach (var b in updatedBuildings)
+            {
+                BuildingsIndex.Insert(b.Geometry.EnvelopeInternal, b);
+            }
+            BuildingsIndex.Build();
         }
 
         private static string WriteGeoJson(string poliesDir, Geometry geometry, string id)
@@ -364,25 +385,60 @@ namespace OsmGursBuildingImport
                     int val => val,
                     _ => (int?)null
                 };
-                //var buildingType = shapeReader["VRSTA_STAVBE"]?.ToString();// DODANO
-                //var material = shapeReader["MATERIAL"]?.ToString();// DODANO
+                var buildingType = shapeReader["TIP_STAVBE"] switch {// DODANO (Vrsta zgradbe)
+                    double val => MapBuildingType((int)val),
+                    int val => MapBuildingType(val),
+                    _ => (string?)null
+                };
+
+                var material = shapeReader["NOSILNA_KO"] switch {// DODANO (Nosilna konstrukcija)
+                    double val => MapMaterial((int)val),
+                    int val => MapMaterial(val),
+                    _ => (string?)null
+                };
                 
                 BuildingsIndex.Insert(geometry.EnvelopeInternal, new BuildingInfo(
                     id,
                     geometry,
                     null,
-                    addresses,
+                    null, //addresses, // spremenjeno
                     yearOfConstruction,
                     minElevation,
                     maxElevation,
                     elevation,
                     levels,
-                    null, // buildingType
-                    null // material
+                    buildingType,
+                    material
                 ));
             }
 
             BuildingsIndex.Build();
+        }
+        private static string? MapMaterial(int code)
+        {
+            return code switch
+            {
+                1 => "brick",
+                2 => "concrete",
+                3 => "stone",
+                4 => "wood",
+                5 => "mixed",
+                6 => "metal",
+                7 => "prefabricated",
+                8 => "other",
+                _ => null
+            };
+        }
+
+        private static string? MapBuildingType(int code)
+        {
+            return code switch
+            {
+                1 => "detached",
+                2 => "semidetached_house",
+                3 => "terrace",
+                _ => null
+            };
         }
     }
 }

@@ -26,25 +26,21 @@ namespace OsmGursBuildingImport
 
         static async Task<int> Main(string[] args)
         {
-            while (true)
+            try
             {
-                try
-                {
-                    //var restartToken = new CancellationTokenSource();
-                    //int dayOfWeek = (int)DateTime.UtcNow.DayOfWeek;
-                    //DateTime nextSunday6AM = DateTime.UtcNow.AddDays(7 - dayOfWeek).Date.AddHours(6);
-                    //restartToken.CancelAfter(nextSunday6AM - DateTime.UtcNow);
-                    var restartToken = new CancellationTokenSource(); // Brez timeuta
-                    var result = await Process(args, restartToken.Token);
-                    if (result != 0)
-                        return result;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                    //await Task.Delay(TimeSpan.FromMinutes(1));
-                    return 1; // Return error namesto loop
-                }
+                //var restartToken = new CancellationTokenSource();
+                //int dayOfWeek = (int)DateTime.UtcNow.DayOfWeek;
+                //DateTime nextSunday6AM = DateTime.UtcNow.AddDays(7 - dayOfWeek).Date.AddHours(6);
+                //restartToken.CancelAfter(nextSunday6AM - DateTime.UtcNow);
+                var restartToken = new CancellationTokenSource(); // Brez timeuta
+                var result = await Process(args, restartToken.Token);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ERROR: " + ex.ToString());
+                //await Task.Delay(TimeSpan.FromMinutes(1));
+                return 1; // Return error namesto loop
             }
         }
 
@@ -326,13 +322,22 @@ namespace OsmGursBuildingImport
 
         private static void CreateFull(ProcessingArea processingArea, string cacheFolder)
         {
-            Console.WriteLine($"Creating {processingArea.Name}..."); // DODANO
+            Console.WriteLine($"Creating {processingArea.Name} with {processingArea.Buildings.Count} buildings ..."); // DODANO
             var osmBuilderFull = new OsmBuilder();
+            int buildingsWithAddresses = 0;
+            int totalAddresses = 0;
+
             foreach (var gursBuilding in processingArea.Buildings)
             {
+                if (gursBuilding.Addresses != null && gursBuilding.Addresses.Count > 0)
+                {
+                    buildingsWithAddresses++;
+                    totalAddresses += gursBuilding.Addresses.Count;
+                }
                 osmBuilderFull.AddBuilding(gursBuilding, true);
             }
 
+            Console.WriteLine($"  → {buildingsWithAddresses} buildings have {totalAddresses} addresses");
             string areaPath = Path.Combine(cacheFolder, $"{processingArea.Name}.full");
             SaveData(areaPath, osmBuilderFull.GetGeos());
             Console.WriteLine($"✓ Saved {processingArea.Name}"); // DODANO
